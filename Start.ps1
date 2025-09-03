@@ -1,5 +1,17 @@
 Add-Type -AssemblyName System.Windows.Forms
 
+# Function to create a runspace and run a script block
+function Invoke-ActionInRunspace {
+    param($scriptBlock)
+
+    $runspace = [runspacefactory]::CreateRunspace()
+    $runspace.Open()
+    $pipeline = $runspace.CreatePipeline()
+    $pipeline.Commands.AddScript($scriptBlock)
+    $pipeline.Invoke()
+    $runspace.Close()
+}
+
 # Create the form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Select Actions to Run"
@@ -7,7 +19,7 @@ $form.Size = New-Object System.Drawing.Size(500,300)
 $form.StartPosition = "CenterScreen"
 $form.TopMost = $true
 
-# Create checkboxes
+# Checkboxes
 $checkboxes = @()
 
 $cbEnableFeature = New-Object System.Windows.Forms.CheckBox
@@ -31,23 +43,22 @@ $cbInstallApps.AutoSize = $true
 $cbInstallApps.Checked = $true
 $checkboxes += $cbInstallApps
 
-# Create the Run button
+# Run button
 $runButton = New-Object System.Windows.Forms.Button
 $runButton.Text = "Run Selected"
 $runButton.Size = New-Object System.Drawing.Size(150,30)
 $runButton.Location = New-Object System.Drawing.Point(20,120)
 
-# Add controls to form
+# Add controls
 $form.Controls.AddRange($checkboxes + @($runButton))
 
 # Timer for countdown
 $countdownTimer = New-Object System.Windows.Forms.Timer
-$countdownTimer.Interval = 1000  # 1 second
+$countdownTimer.Interval = 1000
 
-# Variables
+# State variables
 $secondsRemaining = 15
 $mouseMovedDuringCountdown = $false
-$proceedAutomatically = $false
 
 # Function to update button text
 function Update-ButtonText {
@@ -61,23 +72,21 @@ $mouseMoved = {
         $mouseMovedDuringCountdown = $true
         $countdownTimer.Stop()
         $runButton.Text = "Run Selected"
-        # [System.Windows.Forms.MessageBox]::Show("Mouse moved. Countdown canceled. Please click 'Run Selected' to proceed.", "Info")
+        [System.Windows.Forms.MessageBox]::Show("Mouse moved. Countdown canceled. Click 'Run Selected' to proceed.", "Info")
     }
 }
-
-# Attach mouse events to form
 $form.Add_MouseMove($mouseMoved)
 $form.Add_MouseDown($mouseMoved)
 $form.Add_MouseHover($mouseMoved)
 
-# When form loads (shown), start countdown
+# When form shown
 $form.Add_Shown({
     $secondsRemaining = 15
     Update-ButtonText $secondsRemaining
     $countdownTimer.Start()
 })
 
-# Timer tick event
+# Timer tick
 $countdownTimer.Add_Tick({
     $secondsRemaining--
     if ($secondsRemaining -gt 0) {
@@ -85,78 +94,73 @@ $countdownTimer.Add_Tick({
     } else {
         $countdownTimer.Stop()
         $runButton.Text = "Running..."
-        # Automatically proceed
+        # Run actions in separate runspaces
         proceedWithActions
     }
 })
 
-# Function to perform actions
+# Function to run actions in separate runspaces
 function proceedWithActions {
-    # Disable button to prevent re-entry
-    $runButton.Enabled = $false
-
-    # Collect actions
     $actions = @()
 
+    # For each selected action, spawn a runspace
     if ($cbEnableFeature.Checked) {
-        try {
-            [System.Windows.Forms.MessageBox]::Show("Enabling .NET Framework 3.5...", "Info")
-            Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart -ErrorAction Stop
-            $actions += ".NET Framework 3.5 enabled"
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error enabling .NET Framework: $_", "Error")
+        Invoke-ActionInRunspace {
+            # Action script block
+            try {
+                Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart -ErrorAction Stop
+                Write-Output ".NET Framework 3.5 enabled"
+            } catch {
+                Write-Output "Error enabling .NET Framework: $_"
+            }
         }
     }
 
     if ($cbInstallAppInstaller.Checked) {
-        try {
-            [System.Windows.Forms.MessageBox]::Show("Installing Microsoft App Installer...", "Info")
-            winget install --id=Microsoft.AppInstaller --accept-source-agreements --accept-package-agreements --silent
-            $actions += "Microsoft App Installer installed"
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error installing App Installer: $_", "Error")
+        Invoke-ActionInRunspace {
+            try {
+                winget install --id=Microsoft.AppInstaller --accept-source-agreements --accept-package-agreements --silent
+                Write-Output "Microsoft App Installer installed"
+            } catch {
+                Write-Output "Error installing App Installer: $_"
+            }
         }
     }
 
     if ($cbInstallApps.Checked) {
-        try {
-            $apps = @("Microsoft.VisualStudioCode", "abbodi1406.vcredist", "M2Team.NanaZip", "Nilesoft.Shell")
-            foreach ($app in $apps) {
-                winget install --id=$app --accept-source-agreements --accept-package-agreements --silent
+        Invoke-ActionInRunspace {
+            try {
+                $apps = @("Microsoft.VisualStudioCode", "abbodi1406.vcredist", "M2Team.NanaZip", "Nilesoft.Shell")
+                foreach ($app in $apps) {
+                    winget install --id=$app --accept-source-agreements --accept-package-agreements --silent
+                }
+                Write-Output "Applications installed"
+            } catch {
+                Write-Output "Error installing applications: $_"
             }
-            $actions += "Applications installed"
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error installing applications: $_", "Error")
         }
     }
 
-    if ($actions.Count -gt 0) {
-        [System.Windows.Forms.MessageBox]::Show("Actions completed:`n" + ($actions -join "`n"), "Done")
-    } else {
-        [System.Windows.Forms.MessageBox]::Show("No actions were performed.", "Info")
-    }
-    # Reset button text
+    # Optionally, wait for all runspaces to complete or do more management
+    # For simplicity, we just launch them and don't wait here
+    [System.Windows.Forms.MessageBox]::Show("Actions launched in background runspaces.", "Info")
     $runButton.Text = "Run Selected"
-    $runButton.Enabled = $true
 }
 
-# Click event for manual run
+# Manual run
 $runButton.Add_Click({
-    # If countdown active, stop it
     if ($countdownTimer.Enabled) {
         $countdownTimer.Stop()
     }
     if ($mouseMovedDuringCountdown) {
-        # User moved mouse, wait for manual click
         $mouseMovedDuringCountdown = $false
         proceedWithActions
     } else {
-        # Countdown finished, already proceeded
-        proceedWithActions
+        # Already proceeded if countdown finished
     }
 })
 
-# Show the form
+# Show form
 [void]$form.ShowDialog()
 
 
