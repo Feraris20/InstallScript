@@ -5,7 +5,7 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = "Select Actions to Run"
 $form.Size = New-Object System.Drawing.Size(500,300)
 $form.StartPosition = "CenterScreen"
-$form.TopMost = $true
+# $form.TopMost = $true
 
 # Create checkboxes
 $checkboxes = @()
@@ -57,8 +57,7 @@ $countdownTimer.Interval = 1000  # 1 second
 # Variables
 $secondsRemaining = 15
 $mouseMovedDuringCountdown = $false
-$proceedAutomatically = $false
-
+# $proceedAutomatically = $false
 # Function to update button text
 function Update-ButtonText {
     param($remaining)
@@ -71,7 +70,8 @@ $mouseMoved = {
         $mouseMovedDuringCountdown = $true
         $countdownTimer.Stop()
         $runButton.Text = "Run Selected"
-        [System.Windows.Forms.MessageBox]::Show("Mouse moved. Countdown canceled. Please click 'Run Selected' to proceed.", "Info")
+        # [System.Windows.Forms.MessageBox]::Show("Mouse moved. Countdown canceled. Please click 'Run Selected' to proceed.", "Info")
+        Write-Host "Mouse moved. Countdown canceled. Please click 'Run Selected' to proceed."
     }
 }
 
@@ -102,6 +102,9 @@ $countdownTimer.Add_Tick({
 
 # Function to perform actions
 function proceedWithActions {
+    # Minimize the form
+    $form.WindowState = [System.Windows.Forms.FormWindowState]::Minimized
+
     # Disable button to prevent re-entry
     $runButton.Enabled = $false
 
