@@ -17,7 +17,7 @@ function Get-SystemTheme {
 }
 
 # Detect theme
-$systemTheme = Get-SystemTheme()
+$systemTheme = Get-SystemTheme
 
 # Create the form
 $form = New-Object System.Windows.Forms.Form
