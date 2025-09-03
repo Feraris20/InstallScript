@@ -1,43 +1,13 @@
-# Function to detect system theme
-function Get-SystemTheme {
-    try {
-        $registryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-        $appsUseLightTheme = (Get-ItemProperty -Path $registryPath -Name AppsUseLightTheme -ErrorAction SilentlyContinue).AppsUseLightTheme
-        if ($appsUseLightTheme -eq 0) {
-            return "Dark"
-        } else {
-            return "Light"
-        }
-    } catch {
-        return "Light" # Default to Light if detection fails
-    }
-}
-
-# Variables
-$secondsRemaining = 15
-$mouseMoved = $false
-
-# Create form
 Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
 
+# Create the form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Select Actions to Run"
 $form.Size = New-Object System.Drawing.Size(500,300)
 $form.StartPosition = "CenterScreen"
 $form.TopMost = $true
 
-# Theme colors
-$systemTheme = Get-SystemTheme
-if ($systemTheme -eq "Dark") {
-    $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
-    $form.ForeColor = [System.Drawing.Color]::White
-} else {
-    $form.BackColor = [System.Drawing.Color]::White
-    $form.ForeColor = [System.Drawing.Color]::Black
-}
-
-# Checkboxes
+# Create checkboxes
 $checkboxes = @()
 
 $cbEnableFeature = New-Object System.Windows.Forms.CheckBox
@@ -45,8 +15,6 @@ $cbEnableFeature.Text = "Enable .NET Framework 3.5"
 $cbEnableFeature.Location = New-Object System.Drawing.Point(20,20)
 $cbEnableFeature.AutoSize = $true
 $cbEnableFeature.Checked = $true
-$cbEnableFeature.BackColor = $form.BackColor
-$cbEnableFeature.ForeColor = $form.ForeColor
 $checkboxes += $cbEnableFeature
 
 $cbInstallAppInstaller = New-Object System.Windows.Forms.CheckBox
@@ -54,8 +22,6 @@ $cbInstallAppInstaller.Text = "Install Microsoft App Installer"
 $cbInstallAppInstaller.Location = New-Object System.Drawing.Point(20,50)
 $cbInstallAppInstaller.AutoSize = $true
 $cbInstallAppInstaller.Checked = $true
-$cbInstallAppInstaller.BackColor = $form.BackColor
-$cbInstallAppInstaller.ForeColor = $form.ForeColor
 $checkboxes += $cbInstallAppInstaller
 
 $cbInstallApps = New-Object System.Windows.Forms.CheckBox
@@ -63,17 +29,23 @@ $cbInstallApps.Text = "Install Applications (VSCode, vcredist, NanaZip, Shell)"
 $cbInstallApps.Location = New-Object System.Drawing.Point(20,80)
 $cbInstallApps.AutoSize = $true
 $cbInstallApps.Checked = $true
-$cbInstallApps.BackColor = $form.BackColor
-$cbInstallApps.ForeColor = $form.ForeColor
 $checkboxes += $cbInstallApps
 
-# Run button
+
+$cbWindowsDefender = New-Object System.Windows.Forms.CheckBox
+$cbWindowsDefender.Text = "Disable Windows Defender (zoicware DefenderProTools)"
+$cbWindowsDefender.Location = New-Object System.Drawing.Point(20,110)
+$cbWindowsDefender.AutoSize = $true
+$cbWindowsDefender.Checked = $true
+$checkboxes += $cbWindowsDefender
+
+
+
+# Create the Run button
 $runButton = New-Object System.Windows.Forms.Button
 $runButton.Text = "Run Selected"
 $runButton.Size = New-Object System.Drawing.Size(150,30)
-$runButton.Location = New-Object System.Drawing.Point(20,120)
-$runButton.BackColor = $form.BackColor
-$runButton.ForeColor = $form.ForeColor
+$runButton.Location = New-Object System.Drawing.Point(20,150)
 
 # Add controls to form
 $form.Controls.AddRange($checkboxes + @($runButton))
@@ -82,93 +54,128 @@ $form.Controls.AddRange($checkboxes + @($runButton))
 $countdownTimer = New-Object System.Windows.Forms.Timer
 $countdownTimer.Interval = 1000  # 1 second
 
-# Update button text
-function Update-ButtonText($remaining) {
+# Variables
+$secondsRemaining = 15
+$mouseMovedDuringCountdown = $false
+$proceedAutomatically = $false
+
+# Function to update button text
+function Update-ButtonText {
+    param($remaining)
     $runButton.Text = "Proceed in $remaining s"
 }
 
-# Mouse move event to stop countdown
-$form.Add_MouseMove({
-    $mouseMoved = $true
-})
+# Mouse move event handler
+$mouseMoved = {
+    if ($countdownTimer.Enabled) {
+        $mouseMovedDuringCountdown = $true
+        $countdownTimer.Stop()
+        $runButton.Text = "Run Selected"
+        [System.Windows.Forms.MessageBox]::Show("Mouse moved. Countdown canceled. Please click 'Run Selected' to proceed.", "Info")
+    }
+}
 
-# When form shown, start countdown
+# Attach mouse events to form
+$form.Add_MouseMove($mouseMoved)
+$form.Add_MouseDown($mouseMoved)
+$form.Add_MouseHover($mouseMoved)
+
+# When form loads (shown), start countdown
 $form.Add_Shown({
     $secondsRemaining = 15
-    $mouseMoved = $false
     Update-ButtonText $secondsRemaining
     $countdownTimer.Start()
 })
 
-# Timer tick: countdown
+# Timer tick event
 $countdownTimer.Add_Tick({
-    if ($mouseMoved) {
-        # Mouse moved, stop countdown and do not proceed
-        $countdownTimer.Stop()
-        $runButton.Text = "Countdown Stopped"
-        return
-    }
-
     $secondsRemaining--
     if ($secondsRemaining -gt 0) {
         Update-ButtonText $secondsRemaining
     } else {
         $countdownTimer.Stop()
         $runButton.Text = "Running..."
+        # Automatically proceed
         proceedWithActions
     }
 })
 
-# Manual run button click
+# Function to perform actions
+function proceedWithActions {
+    # Disable button to prevent re-entry
+    $runButton.Enabled = $false
+
+    # Collect actions
+    $actions = @()
+
+    if ($cbEnableFeature.Checked) {
+        try {
+            Write-Host "Enabling .NET Framework 3.5..."
+            Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart -ErrorAction Stop
+            $actions += ".NET Framework 3.5 enabled"
+        } catch {
+            Write-Host "Error enabling .NET Framework: $_"
+        }
+    }
+
+    if ($cbInstallAppInstaller.Checked) {
+        try {
+            Write-Host "Installing Microsoft App Installer..."
+            winget install --id=Microsoft.AppInstaller --accept-source-agreements --accept-package-agreements --silent
+            $actions += "Microsoft App Installer installed"
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error installing App Installer: $_", "Error")
+        }
+    }
+
+    if ($cbInstallApps.Checked) {
+        try {
+            $apps = @("Microsoft.VisualStudioCode", "abbodi1406.vcredist", "M2Team.NanaZip", "Nilesoft.Shell")
+            foreach ($app in $apps) {
+                Write-Host "Installing $app ..."
+                winget install --id=$app --accept-source-agreements --accept-package-agreements --silent
+            }
+            $actions += "Applications installed"
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error installing applications: $_", "Error")
+        }
+    }
+
+    if ($cbWindowsDefender.Checked) {
+        try {
+            Write-Host "Disabling Windows Defender..."
+            Invoke-WebRequest https://raw.githubusercontent.com/zoicware/DefenderProTools/main/DisableDefender.ps1 | Invoke-Expression
+            $actions += "Windows Defender disabled"
+        } catch {
+            Write-Host "Error disabling Windows Defender: $_"
+        }
+    }
+
+    if ($actions.Count -gt 0) {
+        [System.Windows.Forms.MessageBox]::Show("Actions completed:`n" + ($actions -join "`n"), "Done")
+    } else {
+        [System.Windows.Forms.MessageBox]::Show("No actions were performed.", "Info")
+    }
+    # Reset button text
+    $runButton.Text = "Run Selected"
+    $runButton.Enabled = $true
+}
+
+# Click event for manual run
 $runButton.Add_Click({
-    if ($countdownTimer.Enabled) { $countdownTimer.Stop() }
-    proceedWithActions
+    # If countdown active, stop it
+    if ($countdownTimer.Enabled) {
+        $countdownTimer.Stop()
+    }
+    if ($mouseMovedDuringCountdown) {
+        # User moved mouse, wait for manual click
+        $mouseMovedDuringCountdown = $false
+        proceedWithActions
+    } else {
+        # Countdown finished, already proceeded
+        proceedWithActions
+    }
 })
 
-# Helper for background execution
-function Invoke-ActionInRunspace {
-    param([scriptblock]$scriptBlock)
-    $runspace = [runspacefactory]::CreateRunspace()
-    $runspace.Open()
-    try {
-        $pipeline = $runspace.CreatePipeline()
-        $pipeline.Commands.AddScript($scriptBlock)
-        $pipeline.Invoke()
-    } catch {
-        [System.Windows.Forms.MessageBox]::Show("Error executing action: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-    } finally {
-        $runspace.Close()
-    }
-}
-
-# Actions to perform
-function proceedWithActions {
-    $runButton.Enabled = $false
-    try {
-        if ($cbEnableFeature.Checked) {
-            Invoke-ActionInRunspace {
-                Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart -ErrorAction Stop
-            }
-        }
-        if ($cbInstallAppInstaller.Checked) {
-            Invoke-ActionInRunspace {
-                winget install --id=Microsoft.AppInstaller --accept-source-agreements --accept-package-agreements --silent
-            }
-        }
-        if ($cbInstallApps.Checked) {
-            Invoke-ActionInRunspace {
-                $apps = @("Microsoft.VisualStudioCode", "abbodi1406.vcredist", "M2Team.NanaZip", "Nilesoft.Shell")
-                foreach ($app in $apps) {
-                    winget install --id=$app --accept-source-agreements --accept-package-agreements --silent
-                }
-            }
-        }
-    } catch {
-        [System.Windows.Forms.MessageBox]::Show("An error occurred: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-    } finally {
-        $runButton.Text = "Run Selected"
-    }
-}
-
-# Show form
+# Show the form
 [void]$form.ShowDialog()
