@@ -73,7 +73,7 @@ $countdownTimer.Add_Tick({
         $mouseMovedDuringCountdown = $true
         $countdownTimer.Stop()
         $runButton.Text = "Run Selected"
-        [System.Windows.Forms.MessageBox]::Show("Mouse moved. Countdown canceled. Click 'Run Selected' to proceed.", "Info")
+        # [System.Windows.Forms.MessageBox]::Show("Mouse moved. Countdown canceled. Click 'Run Selected' to proceed.", "Info")
         return
     }
 
