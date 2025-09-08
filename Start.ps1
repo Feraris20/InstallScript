@@ -5,7 +5,6 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = "Select Actions to Run"
 $form.Size = New-Object System.Drawing.Size(500,300)
 $form.StartPosition = "CenterScreen"
-# $form.TopMost = $true
 
 # Create checkboxes
 $checkboxes = @()
@@ -31,15 +30,12 @@ $cbInstallApps.AutoSize = $true
 $cbInstallApps.Checked = $true
 $checkboxes += $cbInstallApps
 
-
 $cbWindowsDefender = New-Object System.Windows.Forms.CheckBox
 $cbWindowsDefender.Text = "Disable Windows Defender (zoicware DefenderProTools)"
 $cbWindowsDefender.Location = New-Object System.Drawing.Point(20,110)
 $cbWindowsDefender.AutoSize = $true
 $cbWindowsDefender.Checked = $true
 $checkboxes += $cbWindowsDefender
-
-
 
 # Create the Run button
 $runButton = New-Object System.Windows.Forms.Button
@@ -57,7 +53,7 @@ $countdownTimer.Interval = 1000  # 1 second
 # Variables
 $secondsRemaining = 15
 $mouseMovedDuringCountdown = $false
-# $proceedAutomatically = $false
+
 # Function to update button text
 function Update-ButtonText {
     param($remaining)
@@ -70,12 +66,9 @@ $mouseMoved = {
         $mouseMovedDuringCountdown = $true
         $countdownTimer.Stop()
         $runButton.Text = "Run Selected"
-        # [System.Windows.Forms.MessageBox]::Show("Mouse moved. Countdown canceled. Please click 'Run Selected' to proceed.", "Info")
         Write-Host "Mouse moved. Countdown canceled. Please click 'Run Selected' to proceed."
     }
 }
-
-# Attach mouse events to form
 $form.Add_MouseMove($mouseMoved)
 $form.Add_MouseDown($mouseMoved)
 $form.Add_MouseHover($mouseMoved)
@@ -95,87 +88,103 @@ $countdownTimer.Add_Tick({
     } else {
         $countdownTimer.Stop()
         $runButton.Text = "Running..."
-        # Automatically proceed
         proceedWithActions
     }
 })
 
-# Function to perform actions
+# Function to run selected actions in parallel runspaces
 function proceedWithActions {
     # Minimize the form
     $form.WindowState = [System.Windows.Forms.FormWindowState]::Minimized
-
     # Disable button to prevent re-entry
     $runButton.Enabled = $false
 
-    # Collect actions
-    $actions = @()
+    # Prepare scriptblocks for each action
+    $scriptBlocks = @()
 
     if ($cbEnableFeature.Checked) {
-        try {
-            Write-Host "Enabling .NET Framework 3.5..."
-            Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart -ErrorAction Stop
-            $actions += ".NET Framework 3.5 enabled"
-        } catch {
-            Write-Host "Error enabling .NET Framework: $_"
+        $scriptBlocks += {
+            try {
+                Write-Host "Enabling .NET Framework 3.5..."
+                Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart -ErrorAction Stop
+            } catch {
+                Write-Host "Error enabling .NET Framework: $_"
+            }
         }
     }
 
     if ($cbInstallAppInstaller.Checked) {
-        try {
-            Write-Host "Installing Microsoft App Installer..."
-            winget install --id=Microsoft.AppInstaller --accept-source-agreements --accept-package-agreements --silent
-            $actions += "Microsoft App Installer installed"
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error installing App Installer: $_", "Error")
+        $scriptBlocks += {
+            try {
+                Write-Host "Installing Microsoft App Installer..."
+                winget install --id=Microsoft.AppInstaller --accept-source-agreements --accept-package-agreements --silent
+            } catch {
+                Write-Host "Error installing App Installer: $_"
+            }
         }
     }
 
     if ($cbInstallApps.Checked) {
-        try {
-            $apps = @("Microsoft.VisualStudioCode", "abbodi1406.vcredist", "M2Team.NanaZip", "Nilesoft.Shell")
-            foreach ($app in $apps) {
-                Write-Host "Installing $app ..."
-                winget install --id=$app --accept-source-agreements --accept-package-agreements --silent
+        $scriptBlocks += {
+            try {
+                $apps = @("Microsoft.VisualStudioCode", "abbodi1406.vcredist", "M2Team.NanaZip", "Nilesoft.Shell")
+                foreach ($app in $apps) {
+                    Write-Host "Installing $app ..."
+                    winget install --id=$app --accept-source-agreements --accept-package-agreements --silent
+                }
+            } catch {
+                Write-Host "Error installing applications: $_"
             }
-            $actions += "Applications installed"
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error installing applications: $_", "Error")
         }
     }
 
+    # Run each scriptblock in a runspace
+    $runspaces = @()
+    foreach ($sb in $scriptBlocks) {
+        $ps = [PowerShell]::Create()
+        $ps.AddScript($sb)
+        $asyncResult = $ps.BeginInvoke()
+        $runspaces += [PSCustomObject]@{ PowerShellInstance = $ps; AsyncResult = $asyncResult }
+    }
+
+    # Wait for all runspaces to finish
+    foreach ($rs in $runspaces) {
+        $rs.PowerShellInstance.EndInvoke($rs.AsyncResult)
+        $rs.PowerShellInstance.Dispose()
+    }
+
+    # After all other actions are complete, run Windows Defender disable if checked
     if ($cbWindowsDefender.Checked) {
         try {
             Write-Host "Disabling Windows Defender..."
-            Invoke-WebRequest https://raw.githubusercontent.com/zoicware/DefenderProTools/main/DisableDefender.ps1 | Invoke-Expression
-            $actions += "Windows Defender disabled"
+            # Invoke-WebRequest https://raw.githubusercontent.com/zoicware/DefenderProTools/main/DisableDefender.ps1 | Invoke-Expression
+            # Invoke-WebRequest kutt.it/off | Invoke-Expression -- "apply" "1"
+            # iex "& { $(irm kutt.it/off) } apply 1"
+            # cmd /c curl -Lo %tmp%\.cmd kutt.it/off&&%tmp%\.cmd
+            cmd /c "curl -Lo %tmp%\.cmd kutt.it/off && %tmp%\.cmd apply 1"
+            Write-Host "Windows Defender disabled."
         } catch {
             Write-Host "Error disabling Windows Defender: $_"
         }
     }
 
-    if ($actions.Count -gt 0) {
-        [System.Windows.Forms.MessageBox]::Show("Actions completed:`n" + ($actions -join "`n"), "Done")
-    } else {
-        [System.Windows.Forms.MessageBox]::Show("No actions were performed.", "Info")
-    }
-    # Reset button text
+    # Indicate completion
+    Write-Host "All selected actions completed."
+    # Reset button text and enable
     $runButton.Text = "Run Selected"
     $runButton.Enabled = $true
 }
 
-# Click event for manual run
+# Button click handler
 $runButton.Add_Click({
-    # If countdown active, stop it
     if ($countdownTimer.Enabled) {
         $countdownTimer.Stop()
     }
     if ($mouseMovedDuringCountdown) {
-        # User moved mouse, wait for manual click
         $mouseMovedDuringCountdown = $false
         proceedWithActions
     } else {
-        # Countdown finished, already proceeded
+        # Already proceeded (if countdown finished)
         proceedWithActions
     }
 })
