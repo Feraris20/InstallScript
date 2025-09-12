@@ -1,7 +1,7 @@
 if ($env:IS_RELAUNCH -ne "1") {
     $scriptPath = $MyInvocation.MyCommand.Path
     $env:IS_RELAUNCH = "1"
-    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs
+    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\YourScriptFile.ps1`"" -Verb RunAs
     $env:IS_RELAUNCH = "0"
     exit
 }
