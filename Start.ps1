@@ -108,6 +108,18 @@ function proceedWithActions {
     # Disable button to prevent re-entry
     $runButton.Enabled = $false
 
+    if ($cbInstallAppInstaller.Checked) {
+        $scriptBlocks += {
+            try {
+                Write-Host "Installing Microsoft App Installer..."
+                winget install --id=Microsoft.AppInstaller --accept-source-agreements --accept-package-agreements --silent
+            }
+            catch {
+                Write-Host "Error installing App Installer: $_"
+            }
+        }
+    }
+
     # Prepare scriptblocks for each action
     $scriptBlocks = @()
 
@@ -123,20 +135,10 @@ function proceedWithActions {
         }
     }
 
-    if ($cbInstallAppInstaller.Checked) {
-        $scriptBlocks += {
-            try {
-                Write-Host "Installing Microsoft App Installer..."
-                winget install --id=Microsoft.AppInstaller --accept-source-agreements --accept-package-agreements --silent
-            }
-            catch {
-                Write-Host "Error installing App Installer: $_"
-            }
-        }
-    }
 
 
-    
+
+
 
     if ($cbInstallApps.Checked) {
         $scriptBlocks += {
@@ -231,48 +233,49 @@ function proceedWithActions {
                 catch {
                     Write-Output "Could not find registry key for $executableName."
                 }            
-        } catch {
-            Write-Host "Error installing Floorp Extras: $_"
+            }
+            catch {
+                Write-Host "Error installing Floorp Extras: $_"
+            }
         }
     }
-}
 
-# Run each scriptblock in a runspace
-$runspaces = @()
-foreach ($sb in $scriptBlocks) {
-    $ps = [PowerShell]::Create()
-    $ps.AddScript($sb)
-    $asyncResult = $ps.BeginInvoke()
-    $runspaces += [PSCustomObject]@{ PowerShellInstance = $ps; AsyncResult = $asyncResult }
-}
-
-# Wait for all runspaces to finish
-foreach ($rs in $runspaces) {
-    $rs.PowerShellInstance.EndInvoke($rs.AsyncResult)
-    $rs.PowerShellInstance.Dispose()
-}
-
-# After all other actions are complete, run Windows Defender disable if checked
-if ($cbWindowsDefender.Checked) {
-    try {
-        Write-Host "Disabling Windows Defender..."
-        # Invoke-WebRequest https://raw.githubusercontent.com/zoicware/DefenderProTools/main/DisableDefender.ps1 | Invoke-Expression
-        # Invoke-WebRequest kutt.it/off | Invoke-Expression -- "apply" "1"
-        # iex "& { $(irm kutt.it/off) } apply 1"
-        # cmd /c curl -Lo %tmp%\.cmd kutt.it/off&&%tmp%\.cmd
-        cmd /c "curl -Lo %tmp%\.cmd kutt.it/off && %tmp%\.cmd apply 1"
-        Write-Host "Windows Defender disabled."
+    # Run each scriptblock in a runspace
+    $runspaces = @()
+    foreach ($sb in $scriptBlocks) {
+        $ps = [PowerShell]::Create()
+        $ps.AddScript($sb)
+        $asyncResult = $ps.BeginInvoke()
+        $runspaces += [PSCustomObject]@{ PowerShellInstance = $ps; AsyncResult = $asyncResult }
     }
-    catch {
-        Write-Host "Error disabling Windows Defender: $_"
-    }
-}
 
-# Indicate completion
-Write-Host "All selected actions completed."
-# Reset button text and enable
-$runButton.Text = "Run Selected"
-$runButton.Enabled = $true
+    # Wait for all runspaces to finish
+    foreach ($rs in $runspaces) {
+        $rs.PowerShellInstance.EndInvoke($rs.AsyncResult)
+        $rs.PowerShellInstance.Dispose()
+    }
+
+    # After all other actions are complete, run Windows Defender disable if checked
+    if ($cbWindowsDefender.Checked) {
+        try {
+            Write-Host "Disabling Windows Defender..."
+            # Invoke-WebRequest https://raw.githubusercontent.com/zoicware/DefenderProTools/main/DisableDefender.ps1 | Invoke-Expression
+            # Invoke-WebRequest kutt.it/off | Invoke-Expression -- "apply" "1"
+            # iex "& { $(irm kutt.it/off) } apply 1"
+            # cmd /c curl -Lo %tmp%\.cmd kutt.it/off&&%tmp%\.cmd
+            cmd /c "curl -Lo %tmp%\.cmd kutt.it/off && %tmp%\.cmd apply 1"
+            Write-Host "Windows Defender disabled."
+        }
+        catch {
+            Write-Host "Error disabling Windows Defender: $_"
+        }
+    }
+
+    # Indicate completion
+    Write-Host "All selected actions completed."
+    # Reset button text and enable
+    $runButton.Text = "Run Selected"
+    $runButton.Enabled = $true
 }
 
 # Button click handler
@@ -283,7 +286,8 @@ $runButton.Add_Click({
         if ($mouseMovedDuringCountdown) {
             $mouseMovedDuringCountdown = $false
             proceedWithActions
-        } else {
+        }
+        else {
             # Already proceeded (if countdown finished)
             proceedWithActions
         }
