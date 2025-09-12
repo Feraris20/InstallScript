@@ -32,7 +32,7 @@ $checkboxes += $cbInstallApps
 
 $cbInstallFloorpExtras = New-Object System.Windows.Forms.CheckBox
 $cbInstallFloorpExtras.Text = "Install Floorp + Extras"
-$cbInstallFloorpExtras.Location = New-Object System.Drawing.Point(20, 80)
+$cbInstallFloorpExtras.Location = New-Object System.Drawing.Point(20, 110)
 $cbInstallFloorpExtras.AutoSize = $true
 $cbInstallFloorpExtras.Checked = $true
 $checkboxes += $cbInstallFloorpExtras
@@ -40,7 +40,7 @@ $checkboxes += $cbInstallFloorpExtras
 
 $cbWindowsDefender = New-Object System.Windows.Forms.CheckBox
 $cbWindowsDefender.Text = "Disable Windows Defender (kutt.it/off)" #(zoicware DefenderProTools)"
-$cbWindowsDefender.Location = New-Object System.Drawing.Point(20, 110)
+$cbWindowsDefender.Location = New-Object System.Drawing.Point(20, 140)
 $cbWindowsDefender.AutoSize = $true
 $cbWindowsDefender.Checked = $false #$true
 $checkboxes += $cbWindowsDefender
@@ -49,7 +49,7 @@ $checkboxes += $cbWindowsDefender
 $runButton = New-Object System.Windows.Forms.Button
 $runButton.Text = "Run Selected"
 $runButton.Size = New-Object System.Drawing.Size(150, 30)
-$runButton.Location = New-Object System.Drawing.Point(20, 150)
+$runButton.Location = New-Object System.Drawing.Point(20, 170)
 
 # Add controls to form
 $form.Controls.AddRange($checkboxes + @($runButton))
