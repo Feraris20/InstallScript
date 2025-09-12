@@ -1,3 +1,11 @@
+if ($env:IS_RELAUNCH -ne "1") {
+    $scriptPath = $MyInvocation.MyCommand.Path
+    $env:IS_RELAUNCH = "1"
+    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs
+    $env:IS_RELAUNCH = "0"
+    exit
+}
+
 Add-Type -AssemblyName System.Windows.Forms
 
 # Create the form
@@ -88,6 +96,7 @@ $form.Add_Shown({
         $countdownTimer.Start()
     })
 
+
 # Timer tick event
 $countdownTimer.Add_Tick({
         $secondsRemaining--
@@ -112,7 +121,7 @@ function proceedWithActions {
         $scriptBlocks += {
             try {
                 Write-Host "Installing Microsoft App Installer..."
-                winget install --id=Microsoft.AppInstaller --accept-source-agreements --accept-package-agreements --silent
+                winget install --id=Microsoft.AppInstaller --accept-source-agreements --accept-package-agreements --silent                
             }
             catch {
                 Write-Host "Error installing App Installer: $_"
@@ -136,10 +145,6 @@ function proceedWithActions {
     }
 
 
-
-
-
-
     if ($cbInstallApps.Checked) {
         $scriptBlocks += {
             try {
@@ -147,6 +152,8 @@ function proceedWithActions {
                 foreach ($app in $apps) {
                     Write-Host "Installing $app ..."
                     winget install --id=$app --accept-source-agreements --accept-package-agreements --silent
+                    Start-Sleep 1
+                    Write-Output "sssssssssInstalling $app ..."
                 }
             }
             catch {
