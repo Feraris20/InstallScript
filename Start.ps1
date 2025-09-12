@@ -1,10 +1,4 @@
-if ($env:IS_RELAUNCH -ne "1") {
-    $scriptPath = $MyInvocation.MyCommand.Path
-    $env:IS_RELAUNCH = "1"
-    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Start.ps1`"" -Verb RunAs
-    $env:IS_RELAUNCH = "0"
-    exit
-}
+
 
 Add-Type -AssemblyName System.Windows.Forms
 
@@ -299,6 +293,35 @@ $runButton.Add_Click({
             proceedWithActions
         }
     })
+
+if ($env:IS_RELAUNCH -ne "1") {
+$env:IS_RELAUNCH = "1"
+
+    $script = if ($PSCommandPath) {
+        "& { & `'$($PSCommandPath)`' $($argList -join ' ') }"
+    } else {
+        "&([ScriptBlock]::Create((irm https://github.com/Feraris20/InstallScript/blob/main/Start.ps1))) $($argList -join ' ')"
+    }
+
+    $powershellCmd = if (Get-Command pwsh -ErrorAction SilentlyContinue) { "pwsh" } else { "powershell" }
+    $processCmd = if (Get-Command wt.exe -ErrorAction SilentlyContinue) { "wt.exe" } else { "$powershellCmd" }
+
+    if ($processCmd -eq "wt.exe") {
+        Start-Process $processCmd -ArgumentList "$powershellCmd -ExecutionPolicy Bypass -NoProfile -Command `"$script`"" -Verb RunAs
+    } else {
+        Start-Process $processCmd -ArgumentList "-ExecutionPolicy Bypass -NoProfile -Command `"$script`"" -Verb RunAs
+    }
+    $env:IS_RELAUNCH = "0"
+    exit
+}
+
+#     if ($env:IS_RELAUNCH -ne "1") {
+#     $scriptPath = $MyInvocation.MyCommand.Path
+#     $env:IS_RELAUNCH = "1"
+#     Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs
+#     $env:IS_RELAUNCH = "0"
+#     exit
+# }
 
 # Show the form
 [void]$form.ShowDialog()
