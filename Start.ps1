@@ -3,7 +3,8 @@ if ($env:IS_RELAUNCH -ne "1") {
 
     $script = if ($PSCommandPath) {
         "& { & `'$($PSCommandPath)`' $($argList -join ' ') }"
-    } else {
+    }
+    else {
         "&([ScriptBlock]::Create((irm https://raw.githubusercontent.com/Feraris20/InstallScript/refs/heads/main/Start.ps1))) $($argList -join ' ')"
     }
 
@@ -12,7 +13,8 @@ if ($env:IS_RELAUNCH -ne "1") {
 
     if ($processCmd -eq "wt.exe") {
         Start-Process $processCmd -ArgumentList "$powershellCmd -ExecutionPolicy Bypass -NoProfile -Command `"$script`"" -Verb RunAs
-    } else {
+    }
+    else {
         Start-Process $processCmd -ArgumentList "-ExecutionPolicy Bypass -NoProfile -Command `"$script`"" -Verb RunAs
     }
     $env:IS_RELAUNCH = "0"
@@ -189,7 +191,23 @@ function proceedWithActions {
             }
         }
     }
-    msg * /time:55 /W "&#x274C; Waiting for ..."
+
+
+    # Run each scriptblock in a runspace
+    $runspaces = @()
+    foreach ($sb in $scriptBlocks) {
+        $ps = [PowerShell]::Create()
+        $ps.AddScript($sb)
+        $asyncResult = $ps.BeginInvoke()
+        $runspaces += [PSCustomObject]@{ PowerShellInstance = $ps; AsyncResult = $asyncResult }
+    }
+
+    # Wait for all runspaces to finish
+    foreach ($rs in $runspaces) {
+        $rs.PowerShellInstance.EndInvoke($rs.AsyncResult)
+        $rs.PowerShellInstance.Dispose()
+    }
+
     if ($cbInstallFloorpExtras.Checked) {
         $scriptBlocks += {
             try {
@@ -258,21 +276,6 @@ function proceedWithActions {
                 Write-Host "Error installing Floorp Extras: $_"
             }
         }
-    }
-
-    # Run each scriptblock in a runspace
-    $runspaces = @()
-    foreach ($sb in $scriptBlocks) {
-        $ps = [PowerShell]::Create()
-        $ps.AddScript($sb)
-        $asyncResult = $ps.BeginInvoke()
-        $runspaces += [PSCustomObject]@{ PowerShellInstance = $ps; AsyncResult = $asyncResult }
-    }
-
-    # Wait for all runspaces to finish
-    foreach ($rs in $runspaces) {
-        $rs.PowerShellInstance.EndInvoke($rs.AsyncResult)
-        $rs.PowerShellInstance.Dispose()
     }
 
     # After all other actions are complete, run Windows Defender disable if checked
