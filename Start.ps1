@@ -189,7 +189,7 @@ function proceedWithActions {
             }
         }
     }
-
+    msg * /time:55 /W "&#x274C; Waiting for ..."
     if ($cbInstallFloorpExtras.Checked) {
         $scriptBlocks += {
             try {
