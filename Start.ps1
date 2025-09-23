@@ -163,27 +163,12 @@ function proceedWithActions {
     if ($cbInstallApps.Checked) {
         $scriptBlocks += {
             try {
-                $apps = @("Microsoft.VisualStudioCode", "abbodi1406.vcredist", "M2Team.NanaZip", "IrfanSkiljan.IrfanView", "IrfanSkiljan.IrfanView.PlugIns", "CodecGuide.K-LiteCodecPack.Standard", "Nilesoft.Shell")
+                $apps = @("Microsoft.VisualStudioCode", "abbodi1406.vcredist", "M2Team.NanaZip", "IrfanSkiljan.IrfanView", "IrfanSkiljan.IrfanView.PlugIns", "CodecGuide.K-LiteCodecPack.Standard", "Ablaze.Floorp", "Nilesoft.Shell")
                 foreach ($app in $apps) {
                     Write-Host "Installing $app ..."
                     winget install --id=$app --accept-source-agreements --accept-package-agreements --silent
                     Start-Sleep 1
                     Write-Output "sssssssssInstalling $app ..."
-                }
-            }
-            catch {
-                Write-Host "Error installing applications: $_"
-            }
-        }
-    }
-
-    if ($cbInstallApps.Checked) {
-        $scriptBlocks += {
-            try {
-                $apps = @("Microsoft.VisualStudioCode", "abbodi1406.vcredist", "M2Team.NanaZip", "IrfanSkiljan.IrfanView", "IrfanSkiljan.IrfanView.PlugIns", "Ablaze.Floorp", "Nilesoft.Shell")
-                foreach ($app in $apps) {
-                    Write-Host "Installing $app ..."
-                    winget install --id=$app --accept-source-agreements --accept-package-agreements --silent
                 }
             }
             catch {
