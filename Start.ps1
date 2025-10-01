@@ -5,7 +5,7 @@ if ($env:IS_RELAUNCH -ne "1") {
         "& { & `'$($PSCommandPath)`' $($argList -join ' ') }"
     }
     else {
-        "&([ScriptBlock]::Create((irm https://raw.githubusercontent.com/Feraris20/InstallScript/refs/heads/main/Start.ps1))) $($argList -join ' ')"
+        "&([ScriptBlock]::Create((irm https://raw.githubusercontent.com/Feraris20/InstallScript/refs/heads/main/Main.ps1))) $($argList -join ' ')"
     }
 
     $powershellCmd = if (Get-Command pwsh -ErrorAction SilentlyContinue) { "pwsh" } else { "powershell" }
@@ -196,8 +196,6 @@ function proceedWithActions {
     if ($cbInstallFloorpExtras.Checked) {
         $scriptBlocks += {
             try {
-                #winget install --id=Ablaze.Floorp -e --accept-source-agreements --accept-package-agreements
-
                 # Replace 'program.exe' with the actual executable name
                 $executableName = "floorp.exe"
 
