@@ -100,34 +100,38 @@ $button.Add_Click({
     # Install Floorp + Extras if checked
     if ($checkboxFloorpExtras.Checked) {
         Write-Host "Installing Floorp + Extras..." -ForegroundColor Yellow
-        try {
-            # Replace 'YourRegistryPath' with the actual registry path you want to use
-            $registryPath = "HKCU:\Software\YourApp"  # Example path; replace as needed
+            try {
+                # Replace 'program.exe' with the actual executable name
+                $executableName = "floorp.exe"
 
-            # Get the default value which usually contains the full path
-            $programPath = (Get-ItemProperty -Path $registryPath -ErrorAction Stop).'(Default)'
+                # Registry path to check
+                $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$executableName"
 
-            if ($programPath) {
-                # Extract the directory from the full path
-                $installDirectory = Split-Path $programPath -Parent
+                try {
+                    # Get the default value which usually contains the full path
+                    $programPath = (Get-ItemProperty -Path $registryPath -ErrorAction Stop).'(Default)'
+    
+                    if ($programPath) {
+                        # Extract the directory from the full path
+                        $installDirectory = Split-Path $programPath -Parent
 
-                # Define the 'distribution' folder path
-                $distributionFolder = Join-Path -Path $installDirectory -ChildPath "distribution"
+                        # Define the 'distribution' folder path
+                        $distributionFolder = Join-Path -Path $installDirectory -ChildPath "distribution"
 
-                # Create the 'distribution' folder if it doesn't exist
-                if (-Not (Test-Path -Path $distributionFolder)) {
-                    New-Item -Path $distributionFolder -ItemType Directory | Out-Null
-                    Write-Output "Created folder: $distributionFolder"
-                }
-                else {
-                    Write-Output "Folder already exists: $distributionFolder"
-                }
+                        # Create the 'distribution' folder if it doesn't exist
+                        if (-Not (Test-Path -Path $distributionFolder)) {
+                            New-Item -Path $distributionFolder -ItemType Directory | Out-Null
+                            Write-Output "Created folder: $distributionFolder"
+                        }
+                        else {
+                            Write-Output "Folder already exists: $distributionFolder"
+                        }
 
-                # Path for policies.json
-                $policiesFilePath = Join-Path -Path $distributionFolder -ChildPath "policies.json"
+                        # Path for policies.json
+                        $policiesFilePath = Join-Path -Path $distributionFolder -ChildPath "policies.json"
 
-                # Define the JSON content
-                $jsonContent = @"
+                        # Define the JSON content
+                        $jsonContent = @"
 {
   "policies": {
     "Extensions": {
@@ -143,16 +147,22 @@ $button.Add_Click({
 }
 "@
 
-                # Write JSON to file without BOM
-                $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-                [System.IO.File]::WriteAllText($policiesFilePath, $jsonContent, $utf8NoBom)
-                Write-Output "Created policies.json at: $policiesFilePath"
-            } else {
-                Write-Host "Registry path or default value not found." -ForegroundColor Red
+                        # Write JSON to file without BOM
+                        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+                        [System.IO.File]::WriteAllText($policiesFilePath, $jsonContent, $utf8NoBom)
+                        Write-Output "Created policies.json at: $policiesFilePath"
+                    }
+                    else {
+                        Write-Output "Path not found in registry for $executableName"
+                    }
+                }
+                catch {
+                    Write-Output "Could not find registry key for $executableName."
+                }            
             }
-        } catch {
-            Write-Host "Error during Floorp + Extras setup: $($_.Exception.Message)" -ForegroundColor Red
-        }
+            catch {
+                Write-Host "Error installing Floorp Extras: $_"
+            }
     }
 
     Write-Host "Operations completed." -ForegroundColor Cyan
