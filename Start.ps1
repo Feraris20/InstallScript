@@ -21,6 +21,8 @@ if ($env:IS_RELAUNCH -ne "1") {
     exit
 }
 
+exit
+
 Add-Type -AssemblyName System.Windows.Forms
 
 # Create the form
