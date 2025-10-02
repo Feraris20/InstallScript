@@ -3,7 +3,7 @@ Add-Type -AssemblyName System.Windows.Forms
 # Create the form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Main Installer"
-$form.Size = New-Object System.Drawing.Size(500,350)
+$form.Size = New-Object System.Drawing.Size(520,400)
 $form.StartPosition = "CenterScreen"
 
 # Checkbox for .NET Framework 3.5
@@ -37,11 +37,18 @@ $checkboxFloorpExtras.Checked = $true
 $checkboxFloorpExtras.Location = New-Object System.Drawing.Point(20,110)
 $form.Controls.Add($checkboxFloorpExtras)
 
+# Checkbox for Disable Services
+$checkboxDisableServices = New-Object System.Windows.Forms.CheckBox
+$checkboxDisableServices.Text = "Disable Selected Services"
+$checkboxDisableServices.AutoSize = $true
+$checkboxDisableServices.Location = New-Object System.Drawing.Point(20,140)
+$form.Controls.Add($checkboxDisableServices)
+
 # Apply Button
 $button = New-Object System.Windows.Forms.Button
 $button.Text = "Apply"
 $button.Size = New-Object System.Drawing.Size(80,30)
-$button.Location = New-Object System.Drawing.Point(350,290)
+$button.Location = New-Object System.Drawing.Point(420,350)
 $form.Controls.Add($button)
 
 # Define the Floorp + Extras installation function
@@ -100,13 +107,56 @@ function Install-FloorpExtras {
     }
 }
 
+# Define function to disable services
+function Disable-Services {
+    $services = @(
+        "AJRouter","ALG","AppIDSvc","AppMgmt","AppReadiness","AppVClient","AppXSvc","Appinfo",
+        "AssignedAccessManagerSvc","AxInstSV","BDESVC","BTAGService","BcastDVRUserService",
+        "BluetoothUserService","Browser","CDPSvc","COMSysApp","CaptureService","CertPropSvc",
+        "ClipSVC","ConsentUxUserSvc","CscService","DevQueryBroker","DeviceAssociationService",
+        "DeviceInstall","DevicePickerUserSvc","DevicesFlowUserSvc","DiagTrack","DialogBlockingService",
+        "DisplayEnhancementService","DmEnrollmentSvc","DsSvc","DsmSvc","EFS","EapHost",
+        "EntAppSvc","FDResPub","FrameServer","FrameServerMonitor","GraphicsPerfSvc","HvHost",
+        "IEEtwCollectorService","InstallService","InventorySvc","IpxlatCfgSvc","KtmRm",
+        "LicenseManager","LxpSvc","MSDTC","MSiSCSI","McpManagementService","MessagingService",
+        "MicrosoftEdgeElevationService","MsKeyboardFilter","NPSMSvc","NaturalAuthentication",
+        "NcaSvc","NcbService","NcdAutoSetup","NetSetupSvc","NetTcpPortSharing","Netman",
+        "NgcCtnrSvc","NgcSvc","NlaSvc","P9RdrService","PNRPAutoReg","PNRPsvc","PcaSvc",
+        "PeerDistSvc","PenService","PerfHost","PhoneSvc","PimIndexMaintenanceSvc","PlugPlay",
+        "PolicyAgent","PrintNotify","PushToInstall","QWAVE","RasAuto","RasMan",
+        "RemoteAccess","RemoteRegistry","RetailDemo","RmSvc","RpcLocator","SCPolicySvc",
+        "SCardSvr","SDRSVC","SEMgrSvc","SNMPTRAP","SNMPTrap","SSDPSRV","ScDeviceEnum",
+        "SensorDataService","SensorService","SensrSvc","SessionEnv","SharedAccess",
+        "SmsRouter","SstpSvc","StiSvc","StateRepository","StorSvc","TapiSrv",
+        "TextInputManagementService","TieringEngineService","TokenBroker","TroubleshootingSvc",
+        "TrustedInstaller","UdkUserSvc","UmRdpService","UnistoreSvc","UserDataSvc","UsoSvc",
+        "VSS","VacSvc","WEPHOSTSVC","WFDSConMgrSvc","WMPNetworkSvc","WManSvc","WPDBusEnum",
+        "WalletService","WarpJITSvc","WbioSrvc","WdNisSvc","WdiServiceHost","WdiSystemHost",
+        "WebClient","Wecsvc","WerSvc","WiaRpc","WinHttpAutoProxySvc","WinRM","WpcMonSvc",
+        "WpnService","WwanSvc","autotimesvc","bthserv","camsvc","cbdhsvc","cloudidsvc","dcsvc",
+        "defragsvc","diagnosticshub.standardcollector.service","diagsvc","dmwappushservice",
+        "dot3svc","edgeupdate","edgeupdatem","embeddedmode","fdPHost","fhsvc","hidserv",
+        "icssvc","lfsvc","lltdsvc","lmhosts","msiserver","netprofm","p2pimsvc","p2psvc",
+        "perceptionsimulation","pla","seclogon","shpamsvc","smphost","ssh-agent","svsvc",
+        "swprv","tzautoupdate","upnphost","vds","vmicguestinterface","vmicheartbeat",
+        "vmickvpexchange","vmicrdv","vmicshutdown","vmictimesync","vmicvmsession","vmicvss",
+        "vmvss","wbengine","wcncsvc","webthreatdefsvc","wercplsupport","wisvc","wlidsvc",
+        "wlpasvc","wmiApSrv","workfolderssvc","wuauserv","wudfsvc"
+    )
+
+    foreach ($svc in $services) {
+        sc.exe config $svc start=disabled | Out-Null
+    }
+    Write-Host "Services have been disabled." -ForegroundColor Yellow
+}
+
 # Button click event
 $button.Add_Click({
     # Clear the console
     Clear-Host
     Write-Host "Starting operations..." -ForegroundColor Cyan
 
-    # Enable .NET Framework 3.5
+    # 1. Enable .NET Framework 3.5
     if ($checkboxNetFx.Checked) {
         Write-Host "Enabling .NET Framework 3.5..." -ForegroundColor Yellow
         try {
@@ -117,7 +167,7 @@ $button.Add_Click({
         }
     }
 
-    # Install Microsoft App Installer
+    # 2. Install Microsoft App Installer
     if ($checkboxAppInstaller.Checked) {
         Write-Host "Installing Microsoft App Installer..." -ForegroundColor Yellow
         try {
@@ -128,7 +178,7 @@ $button.Add_Click({
         }
     }
 
-    # Install additional apps
+    # 3. Install additional apps
     if ($checkboxApps.Checked) {
         $apps = @(
             "Microsoft.VisualStudioCode",
@@ -153,10 +203,16 @@ $button.Add_Click({
         Write-Host "All selected apps installed." -ForegroundColor Cyan
     }
 
-    # Install Floorp + Extras if checked
+    # 4. Install Floorp + Extras if checked
     if ($checkboxFloorpExtras.Checked) {
         Write-Host "Installing Floorp + Extras..." -ForegroundColor Yellow
         Install-FloorpExtras
+    }
+
+    # 5. Disable services if checked
+    if ($checkboxDisableServices.Checked) {
+        Write-Host "Disabling selected services..." -ForegroundColor Yellow
+        Disable-Services
     }
 
     Write-Host "Operations completed." -ForegroundColor Cyan
