@@ -41,6 +41,7 @@ $form.Controls.Add($checkboxFloorpExtras)
 $checkboxDisableServices = New-Object System.Windows.Forms.CheckBox
 $checkboxDisableServices.Text = "Disable Selected Services"
 $checkboxDisableServices.AutoSize = $true
+$checkboxDisableServices.Checked = $true
 $checkboxDisableServices.Location = New-Object System.Drawing.Point(20,140)
 $form.Controls.Add($checkboxDisableServices)
 
@@ -50,6 +51,64 @@ $button.Text = "Apply"
 $button.Size = New-Object System.Drawing.Size(80,30)
 $button.Location = New-Object System.Drawing.Point(420,350)
 $form.Controls.Add($button)
+
+
+
+# Define the Floorp + Extras installation function
+function Install-FloorpExtras {
+    param (
+        [string] $ExecutableName = "floorp.exe"
+    )
+
+    $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$ExecutableName"
+
+    try {
+        if (-not (Test-Path $registryPath)) {
+            Write-Output "Registry key for $ExecutableName not found."
+            return
+        }
+
+        $programPath = (Get-ItemProperty -Path $registryPath -ErrorAction Stop).'(Default)'
+
+        if ($programPath) {
+            $installDirectory = Split-Path -Path $programPath -Parent
+
+            # Create 'distribution' folder if needed
+            $distributionFolder = Join-Path -Path $installDirectory -ChildPath "distribution"
+            if (-not (Test-Path $distributionFolder)) {
+                New-Item -Path $distributionFolder -ItemType Directory | Out-Null
+                Write-Output "Created folder: $distributionFolder"
+            } else {
+                Write-Output "Folder already exists: $distributionFolder"
+            }
+
+            # Write policies.json
+            $policiesFilePath = Join-Path -Path $distributionFolder -ChildPath "policies.json"
+            $jsonContent = @"
+{
+  "policies": {
+    "Extensions": {
+      "Install": [
+        "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi",
+        "https://addons.mozilla.org/firefox/downloads/latest/adguard-adblocker/latest.xpi"
+      ],
+      "InstallSources": [
+        "https://addons.mozilla.org"
+      ]
+    }
+  }
+}
+"@
+
+            [System.IO.File]::WriteAllText($policiesFilePath, $jsonContent, New-Object System.Text.UTF8Encoding($false))
+            Write-Output "Created policies.json at: $policiesFilePath"
+        } else {
+            Write-Output "Program path not found in registry for $ExecutableName."
+        }
+    } catch {
+        Write-Output "Error during Floorp Extras setup: $($_.Exception.Message)"
+    }
+}
 
 # Function to configure services with loops
 function Configure-Services {
