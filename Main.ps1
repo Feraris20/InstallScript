@@ -44,6 +44,62 @@ $button.Size = New-Object System.Drawing.Size(80,30)
 $button.Location = New-Object System.Drawing.Point(350,290)
 $form.Controls.Add($button)
 
+# Define the Floorp + Extras installation function
+function Install-FloorpExtras {
+    param (
+        [string] $ExecutableName = "floorp.exe"
+    )
+
+    $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$ExecutableName"
+
+    try {
+        if (-not (Test-Path $registryPath)) {
+            Write-Output "Registry key for $ExecutableName not found."
+            return
+        }
+
+        $programPath = (Get-ItemProperty -Path $registryPath -ErrorAction Stop).'(Default)'
+
+        if ($programPath) {
+            $installDirectory = Split-Path -Path $programPath -Parent
+
+            # Create 'distribution' folder if needed
+            $distributionFolder = Join-Path -Path $installDirectory -ChildPath "distribution"
+            if (-not (Test-Path $distributionFolder)) {
+                New-Item -Path $distributionFolder -ItemType Directory | Out-Null
+                Write-Output "Created folder: $distributionFolder"
+            } else {
+                Write-Output "Folder already exists: $distributionFolder"
+            }
+
+            # Write policies.json
+            $policiesFilePath = Join-Path -Path $distributionFolder -ChildPath "policies.json"
+            $jsonContent = @"
+{
+  "policies": {
+    "Extensions": {
+      "Install": [
+        "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi",
+        "https://addons.mozilla.org/firefox/downloads/latest/adguard-adblocker/latest.xpi"
+      ],
+      "InstallSources": [
+        "https://addons.mozilla.org"
+      ]
+    }
+  }
+}
+"@
+
+            [System.IO.File]::WriteAllText($policiesFilePath, $jsonContent, New-Object System.Text.UTF8Encoding($false))
+            Write-Output "Created policies.json at: $policiesFilePath"
+        } else {
+            Write-Output "Program path not found in registry for $ExecutableName."
+        }
+    } catch {
+        Write-Output "Error during Floorp Extras setup: $($_.Exception.Message)"
+    }
+}
+
 # Button click event
 $button.Add_Click({
     # Clear the console
@@ -100,69 +156,7 @@ $button.Add_Click({
     # Install Floorp + Extras if checked
     if ($checkboxFloorpExtras.Checked) {
         Write-Host "Installing Floorp + Extras..." -ForegroundColor Yellow
-            try {
-                # Replace 'program.exe' with the actual executable name
-                $executableName = "floorp.exe"
-
-                # Registry path to check
-                $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$executableName"
-
-                try {
-                    # Get the default value which usually contains the full path
-                    $programPath = (Get-ItemProperty -Path $registryPath -ErrorAction Stop).'(Default)'
-    
-                    if ($programPath) {
-                        # Extract the directory from the full path
-                        $installDirectory = Split-Path $programPath -Parent
-
-                        # Define the 'distribution' folder path
-                        $distributionFolder = Join-Path -Path $installDirectory -ChildPath "distribution"
-
-                        # Create the 'distribution' folder if it doesn't exist
-                        if (-Not (Test-Path -Path $distributionFolder)) {
-                            New-Item -Path $distributionFolder -ItemType Directory | Out-Null
-                            Write-Output "Created folder: $distributionFolder"
-                        }
-                        else {
-                            Write-Output "Folder already exists: $distributionFolder"
-                        }
-
-                        # Path for policies.json
-                        $policiesFilePath = Join-Path -Path $distributionFolder -ChildPath "policies.json"
-
-                        # Define the JSON content
-                        $jsonContent = @"
-{
-  "policies": {
-    "Extensions": {
-      "Install": [
-        "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi",
-        "https://addons.mozilla.org/firefox/downloads/latest/adguard-adblocker/latest.xpi"
-      ],
-      "InstallSources": [
-        "https://addons.mozilla.org"
-      ]
-    }
-  }
-}
-"@
-
-                        # Write JSON to file without BOM
-                        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-                        [System.IO.File]::WriteAllText($policiesFilePath, $jsonContent, $utf8NoBom)
-                        Write-Output "Created policies.json at: $policiesFilePath"
-                    }
-                    else {
-                        Write-Output "Path not found in registry for $executableName"
-                    }
-                }
-                catch {
-                    Write-Output "Could not find registry key for $executableName."
-                }            
-            }
-            catch {
-                Write-Host "Error installing Floorp Extras: $_"
-            }
+        Install-FloorpExtras
     }
 
     Write-Host "Operations completed." -ForegroundColor Cyan
