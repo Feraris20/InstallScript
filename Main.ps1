@@ -51,106 +51,95 @@ $button.Size = New-Object System.Drawing.Size(80,30)
 $button.Location = New-Object System.Drawing.Point(420,350)
 $form.Controls.Add($button)
 
-# Define the Floorp + Extras installation function
-function Install-FloorpExtras {
-    param (
-        [string] $ExecutableName = "floorp.exe"
+# Function to configure services with loops
+function Configure-Services {
+    # List of services to disable
+    $servicesToDisable = @(
+        "AJRouter","AppVClient","Appinfo","AssignedAccessManagerSvc","BDESVC",
+        "BTAGService","BcastDVRUserService","BluetoothUserService","DiagTrack",
+        "DialogBlockingService","DevQueryBroker","DeviceAssociationService",
+        "DeviceInstall","DevicePickerUserSvc","DevicesFlowUserSvc","RemoteAccess",
+        "RemoteRegistry","SensorDataService","SensrSvc","SharedAccess",
+        "SmsRouter","StiSvc","StateRepository","StorSvc","TapiSrv",
+        "TextInputManagementService","TieringEngineService","TokenBroker",
+        "TroubleshootingSvc","UdkUserSvc","UnistoreSvc","WpnService","WwanSvc",
+        "autotimesvc","bthserv","cbdhsvc","cloudidsvc","dcsvc","defragsvc",
+        "diagnosticshub.standardcollector.service","diagsvc","dmwappushservice",
+        "dot3svc","embeddedmode","fdPHost","fhsvc","hidserv","icssvc",
+        "lfsvc","lltdsvc","lmhosts","netprofm","p2pimsvc","p2psvc",
+        "perceptionsimulation","seclogon","smphost","svsvc","swprv",
+        "tzautoupdate","upnphost","vds","vmicguestinterface","vmicheartbeat",
+        "vmickvpexchange","vmicrdv","vmicshutdown","vmictimesync","vmicvmsession",
+        "vmicvss","vmvss","wbengine","wcncsvc","webthreatdefsvc","wercplsupport",
+        "wisvc","wlidsvc","wlpasvc","wmiApSrv","workfolderssvc","wuauserv",
+        "wudfsvc"
     )
 
-    $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$ExecutableName"
-
-    try {
-        if (-not (Test-Path $registryPath)) {
-            Write-Output "Registry key for $ExecutableName not found."
-            return
-        }
-
-        $programPath = (Get-ItemProperty -Path $registryPath -ErrorAction Stop).'(Default)'
-
-        if ($programPath) {
-            $installDirectory = Split-Path -Path $programPath -Parent
-
-            # Create 'distribution' folder if needed
-            $distributionFolder = Join-Path -Path $installDirectory -ChildPath "distribution"
-            if (-not (Test-Path $distributionFolder)) {
-                New-Item -Path $distributionFolder -ItemType Directory | Out-Null
-                Write-Output "Created folder: $distributionFolder"
-            } else {
-                Write-Output "Folder already exists: $distributionFolder"
-            }
-
-            # Write policies.json
-            $policiesFilePath = Join-Path -Path $distributionFolder -ChildPath "policies.json"
-            $jsonContent = @"
-{
-  "policies": {
-    "Extensions": {
-      "Install": [
-        "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi",
-        "https://addons.mozilla.org/firefox/downloads/latest/adguard-adblocker/latest.xpi"
-      ],
-      "InstallSources": [
-        "https://addons.mozilla.org"
-      ]
-    }
-  }
-}
-"@
-
-            [System.IO.File]::WriteAllText($policiesFilePath, $jsonContent, New-Object System.Text.UTF8Encoding($false))
-            Write-Output "Created policies.json at: $policiesFilePath"
-        } else {
-            Write-Output "Program path not found in registry for $ExecutableName."
-        }
-    } catch {
-        Write-Output "Error during Floorp Extras setup: $($_.Exception.Message)"
-    }
-}
-
-# Define function to disable services
-function Disable-Services {
-    $services = @(
-        "AJRouter","ALG","AppIDSvc","AppMgmt","AppReadiness","AppVClient","AppXSvc","Appinfo",
-        "AssignedAccessManagerSvc","AxInstSV","BDESVC","BTAGService","BcastDVRUserService",
-        "BluetoothUserService","Browser","CDPSvc","COMSysApp","CaptureService","CertPropSvc",
-        "ClipSVC","ConsentUxUserSvc","CscService","DevQueryBroker","DeviceAssociationService",
-        "DeviceInstall","DevicePickerUserSvc","DevicesFlowUserSvc","DiagTrack","DialogBlockingService",
-        "DisplayEnhancementService","DmEnrollmentSvc","DsSvc","DsmSvc","EFS","EapHost",
-        "EntAppSvc","FDResPub","FrameServer","FrameServerMonitor","GraphicsPerfSvc","HvHost",
-        "IEEtwCollectorService","InstallService","InventorySvc","IpxlatCfgSvc","KtmRm",
-        "LicenseManager","LxpSvc","MSDTC","MSiSCSI","McpManagementService","MessagingService",
-        "MicrosoftEdgeElevationService","MsKeyboardFilter","NPSMSvc","NaturalAuthentication",
-        "NcaSvc","NcbService","NcdAutoSetup","NetSetupSvc","NetTcpPortSharing","Netman",
-        "NgcCtnrSvc","NgcSvc","NlaSvc","P9RdrService","PNRPAutoReg","PNRPsvc","PcaSvc",
-        "PeerDistSvc","PenService","PerfHost","PhoneSvc","PimIndexMaintenanceSvc","PlugPlay",
+    # List of services to set to demand
+    $servicesToDemand = @(
+        "ALG","AppIDSvc","AppMgmt","AppReadiness","AppXSvc","CertPropSvc","ClipSVC",
+        "ConsentUxUserSvc","CscService","DeviceInstall","DevicePickerUserSvc",
+        "DevicesFlowUserSvc","DisplayEnhancementService","DmEnrollmentSvc","DsSvc",
+        "DsmSvc","EFS","EapHost","EntAppSvc","FDResPub","FrameServer",
+        "FrameServerMonitor","GraphicsPerfSvc","HvHost","IEEtwCollectorService",
+        "InstallService","InventorySvc","IpxlatCfgSvc","KtmRm","LicenseManager",
+        "LxpSvc","MSDTC","MSiSCSI","McpManagementService","MessagingService",
+        "MicrosoftEdgeElevationService","MsKeyboardFilter","NPSMSvc",
+        "NaturalAuthentication","NcaSvc","NcbService","NcdAutoSetup",
+        "NetSetupSvc","NetTcpPortSharing","Netman","NgcCtnrSvc","NgcSvc",
+        "NlaSvc","P9RdrService","PNRPAutoReg","PNRPsvc","PcaSvc","PeerDistSvc",
+        "PenService","PerfHost","PhoneSvc","PimIndexMaintenanceSvc","PlugPlay",
         "PolicyAgent","PrintNotify","PushToInstall","QWAVE","RasAuto","RasMan",
-        "RemoteAccess","RemoteRegistry","RetailDemo","RmSvc","RpcLocator","SCPolicySvc",
-        "SCardSvr","SDRSVC","SEMgrSvc","SNMPTRAP","SNMPTrap","SSDPSRV","ScDeviceEnum",
-        "SensorDataService","SensorService","SensrSvc","SessionEnv","SharedAccess",
-        "SmsRouter","SstpSvc","StiSvc","StateRepository","StorSvc","TapiSrv",
-        "TextInputManagementService","TieringEngineService","TokenBroker","TroubleshootingSvc",
-        "TrustedInstaller","UdkUserSvc","UmRdpService","UnistoreSvc","UserDataSvc","UsoSvc",
-        "VSS","VacSvc","WEPHOSTSVC","WFDSConMgrSvc","WMPNetworkSvc","WManSvc","WPDBusEnum",
-        "WalletService","WarpJITSvc","WbioSrvc","WdNisSvc","WdiServiceHost","WdiSystemHost",
-        "WebClient","Wecsvc","WerSvc","WiaRpc","WinHttpAutoProxySvc","WinRM","WpcMonSvc",
-        "WpnService","WwanSvc","autotimesvc","bthserv","camsvc","cbdhsvc","cloudidsvc","dcsvc",
-        "defragsvc","diagnosticshub.standardcollector.service","diagsvc","dmwappushservice",
-        "dot3svc","edgeupdate","edgeupdatem","embeddedmode","fdPHost","fhsvc","hidserv",
-        "icssvc","lfsvc","lltdsvc","lmhosts","msiserver","netprofm","p2pimsvc","p2psvc",
-        "perceptionsimulation","pla","seclogon","shpamsvc","smphost","ssh-agent","svsvc",
-        "swprv","tzautoupdate","upnphost","vds","vmicguestinterface","vmicheartbeat",
-        "vmickvpexchange","vmicrdv","vmicshutdown","vmictimesync","vmicvmsession","vmicvss",
-        "vmvss","wbengine","wcncsvc","webthreatdefsvc","wercplsupport","wisvc","wlidsvc",
-        "wlpasvc","wmiApSrv","workfolderssvc","wuauserv","wudfsvc"
+        "SCPolicySvc","SCardSvr","SDRSVC","SEMgrSvc","SNMPTRAP","SNMPTrap",
+        "SSDPSRV","ScDeviceEnum","SensorService","SessionEnv","SmsRouter",
+        "SstpSvc","StiSvc","WerSvc","WiaRpc","WinHttpAutoProxySvc","WinRM",
+        "WpcMonSvc","WdiServiceHost","WdiSystemHost","WebClient",
+        "Wecsvc","Wersvc","WiaRpc","WinHttpAutoProxySvc","WinRM","WpcMonSvc",
+        "WdiServiceHost","WdiSystemHost","webthreatdefsvc","wermgr","WbioSrvc"
     )
 
-    foreach ($svc in $services) {
-        sc.exe config $svc start=disabled | Out-Null
+    # Disable services loop with output
+    foreach ($service in $servicesToDisable) {
+        try {
+            $svc = Get-WmiObject -Class Win32_Service -Filter "Name='$service'"
+            if ($svc) {
+                $result = $svc.ChangeStartMode("Disabled")
+                if ($result.ReturnValue -eq 0) {
+                    Write-Host "Disabled service: $service" -ForegroundColor Gray
+                } else {
+                    Write-Host "Failed to disable $service (ReturnCode: $($result.ReturnValue))" -ForegroundColor Red
+                }
+            } else {
+                Write-Host "Service not found: $service" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "Error disabling $service : $_" -ForegroundColor Red
+        }
     }
-    Write-Host "Services have been disabled." -ForegroundColor Yellow
+
+    # Set services to demand with output
+    foreach ($service in $servicesToDemand) {
+        try {
+            $svc = Get-WmiObject -Class Win32_Service -Filter "Name='$service'"
+            if ($svc) {
+                $result = $svc.ChangeStartMode("Manual")
+                if ($result.ReturnValue -eq 0) {
+                    Write-Host "Set service to demand: $service" -ForegroundColor Gray
+                } else {
+                    Write-Host "Failed to set $service to demand (ReturnCode: $($result.ReturnValue))" -ForegroundColor Red
+                }
+            } else {
+                Write-Host "Service not found: $service" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "Error setting $service to demand: $_" -ForegroundColor Red
+        }
+    }
+
+    Write-Host "Service configuration complete." -ForegroundColor Cyan
 }
 
-# Button click event
+# Your Apply button click event
 $button.Add_Click({
     # Clear the console
     Clear-Host
@@ -209,10 +198,10 @@ $button.Add_Click({
         Install-FloorpExtras
     }
 
-    # 5. Disable services if checked
+    # 5. Configure services if checkbox checked
     if ($checkboxDisableServices.Checked) {
-        Write-Host "Disabling selected services..." -ForegroundColor Yellow
-        Disable-Services
+        Write-Host "Configuring services (disable then demand)..." -ForegroundColor Yellow
+        Configure-Services
     }
 
     Write-Host "Operations completed." -ForegroundColor Cyan
