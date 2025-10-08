@@ -251,6 +251,7 @@ $button.Add_Click({
                 "IrfanSkiljan.IrfanView.PlugIns",
                 "CodecGuide.K-LiteCodecPack.Standard",
                 "Ablaze.Floorp",
+                "Audacity.Audacity",
                 "Nilesoft.Shell"
             )
             foreach ($app in $apps) {
