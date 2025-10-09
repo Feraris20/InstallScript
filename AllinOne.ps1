@@ -122,7 +122,7 @@ while ($true) {
         '0' {
             Write-Color "bye bye" 'Cyan'
             # exit
-            Break
+            return
         }
         default {
             Write-Color "Invalid selection. Please try again." 'Red'
