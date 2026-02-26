@@ -1,5 +1,5 @@
-# Combined PowerShell Script with Menu and '0' Return Option
 Clear-Host
+
 function Write-Color {
     param (
         [string]$Message,
@@ -8,124 +8,107 @@ function Write-Color {
     Write-Host $Message -ForegroundColor $Color
 }
 
-# Names for the scheduled tasks
+# Helper: Removes task if it exists
+function Remove-ScheduledTaskIfExists {
+    param (
+        [string]$TaskName
+    )
+    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+        Write-Color "Removed existing task: $TaskName" 'Yellow'
+        return $true
+    }
+    return $false
+}
+
+# Reusable names
 $shutdownTaskName = "ScheduledShutdown"
 $appStartTaskName = "ScheduledAppStart"
 
-# Function to schedule shutdown
 function Schedule-Shutdown {
-    # Prompt for time
     while ($true) {
         Write-Color "Enter shutdown time in HH:MM (24-hour format), or 0 to return to main menu:" 'Cyan'
         $timeInput = Read-Host
-        if ($timeInput -eq '0') {
-            return
-        }
-        if ($timeInput -match '^(?:[01]\d|2[0-3]):[0-5]\d$') {
-            break
-        } else {
-            Write-Color "Invalid format. Please try again." 'Red'
-        }
+        if ($timeInput -eq '0') { return }
+
+        if ($timeInput -match '^(?:[01]\d|2[0-3]):[0-5]\d$') { break }
+        else { Write-Color "Invalid time format. Try again." 'Red' }
     }
-    # Remove existing task if exists
-    if (Get-ScheduledTask -TaskName $shutdownTaskName -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $shutdownTaskName -Confirm:$false
-    }
-    # Create action
+
+    Remove-ScheduledTaskIfExists -TaskName $shutdownTaskName | Out-Null
+
     $action = New-ScheduledTaskAction -Execute "shutdown" -Argument "/s /f /t 0"
-    # Create trigger
     $trigger = New-ScheduledTaskTrigger -Daily -At $timeInput
-    # Create principal
     $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-    # Register task
+
     Register-ScheduledTask -TaskName $shutdownTaskName -Action $action -Trigger $trigger -Principal $principal
     Write-Color "Shutdown scheduled at $timeInput." 'Green'
 }
 
-# Function to delete shutdown schedule
 function Delete-ShutdownSchedule {
-    if (Get-ScheduledTask -TaskName $shutdownTaskName -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $shutdownTaskName -Confirm:$false
-        Write-Color "Shutdown schedule deleted." 'Green'
-    } else {
+    if (-not (Remove-ScheduledTaskIfExists -TaskName $shutdownTaskName)) {
         Write-Color "No shutdown schedule found." 'Yellow'
     }
 }
 
-# Function to schedule app start
 function Schedule-AppStart {
-    # Prompt for executable path
-    do {
-        Write-Color "Enter full path to the executable, or 0 to return to main menu:" 'Cyan'
+    while ($true) {
+        Write-Color "Enter full path to executable, or 0 to return:" 'Cyan'
         $inputPath = Read-Host
-        if ($inputPath -eq '0') {
-            return
-        }
-        if ($inputPath.StartsWith('"') -and $inputPath.EndsWith('"')) {
-            $exePath = $inputPath.Trim('"')
+        if ($inputPath -eq '0') { return }
+
+        # Trim quotes and whitespaces
+        $exePath = $inputPath.Trim('"').Trim()
+
+        if (-not (Test-Path $exePath -PathType Leaf)) {
+            Write-Color "Invalid path or file not found." 'Red'
+            Write-Color 'Example: "C:\Program Files\MyApp\app.exe"' 'Yellow'
         } else {
-            $exePath = $inputPath
+            break
         }
-        if (-not (Test-Path -Path $exePath -PathType Leaf)) {
-            Write-Color "File does not exist. Please try again." 'Red'
-            Write-Color "Example: C:\Program Files\MyApp\app.exe" 'Yellow'
-            $valid = $false
-        } else {
-            $valid = $true
-        }
-    } while (-not $valid)
-    # Remove existing task if exists
-    if (Get-ScheduledTask -TaskName $appStartTaskName -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $appStartTaskName -Confirm:$false
     }
-    # Create trigger and action
+
+    Remove-ScheduledTaskIfExists -TaskName $appStartTaskName | Out-Null
+
     $trigger = New-ScheduledTaskTrigger -AtLogOn
     $action = New-ScheduledTaskAction -Execute $exePath
-    # Register task
+
     Register-ScheduledTask -TaskName $appStartTaskName -Trigger $trigger -Action $action -RunLevel Highest
     Write-Color "App start scheduled on logon." 'Green'
 }
 
-# Function to delete app start schedule
+
 function Delete-AppStartSchedule {
-    if (Get-ScheduledTask -TaskName $appStartTaskName -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $appStartTaskName -Confirm:$false
-        Write-Color "App start schedule deleted." 'Green'
-    } else {
+    if (-not (Remove-ScheduledTaskIfExists -TaskName $appStartTaskName)) {
         Write-Color "No app start schedule found." 'Yellow'
     }
 }
 
-# Main menu loop
-while ($true) {    
-    Write-Color "`n=== Main Menu ===" 'Cyan'
-    Write-Color "1) Schedule Shutdown"
-    Write-Color "2) Delete Schedule"
-    Write-Color "3) Schedule App Start"
-    Write-Color "4) Delete Schedule App Start"
-    Write-Color "0) Exit (go back on 1 and 3)" 'Blue'
-    $choice = Read-Host "Enter your choice (0-4)"
+# Main Menu Loop
+function Show-MainMenu {
+    while ($true) {
+        Write-Color "`n=== Main Menu ===" 'Cyan'
+        Write-Color "1) Schedule Shutdown"
+        Write-Color "2) Delete Shutdown Schedule"
+        Write-Color "3) Schedule App Start"
+        Write-Color "4) Delete App Start Schedule"
+        Write-Color "0) Exit" 'Blue'
 
-    switch ($choice) {
-        '1' {
-            Schedule-Shutdown
-        }
-        '2' {
-            Delete-ShutdownSchedule
-        }
-        '3' {
-            Schedule-AppStart
-        }
-        '4' {
-            Delete-AppStartSchedule
-        }
-        '0' {
-            Write-Color "bye bye" 'Cyan'
-            # exit
-            return
-        }
-        default {
-            Write-Color "Invalid selection. Please try again." 'Red'
+        $choice = Read-Host "Enter your choice (0-4)"
+        switch ($choice) {
+            '1' { Schedule-Shutdown }
+            '2' { Delete-ShutdownSchedule }
+            '3' { Schedule-AppStart }
+            '4' { Delete-AppStartSchedule }
+            '0' {
+                Write-Color "Goodbye!" 'Cyan'
+                return
+            }
+            default {
+                Write-Color "Invalid selection. Please try again." 'Red'
+            }
         }
     }
 }
+
+Show-MainMenu
